@@ -1,0 +1,54 @@
+---
+title: "Hadoop study"
+date: 2020-07-02
+categories: Hadoop
+---
+
+해당 스터디는 https://www.youtube.com/watch?v=1vbXmCrkT3Y 영상을 보고 배운 내용을 정리한다.
+
+01. Intro to Big Data
+
+* What determines big data?
+Volume, variety, velocity, value, veracity (uncertainty and inconsistency)
+
+structured = in table format
+semi-structured = json, xml, csv
+unstructured = mp3, mp4, jpeg
+
+
+01-1. Big Data Analytics and Big Data Applications
+
+Sample use of Data Analytics
+
+NYPD smarter prediction of crime
+AWS customer behavior analysis for better satisfaction
+cost reduction by hospitals - monitor patients, predict outcome, prepare supplies to save cost
+Next generation products (self-driving cars, Netflix, etc)
+
+01-2. Stages in Data Analytics
+
+1. identify problem
+2. design data requirement
+3. preprocessing
+4. analytics
+5. visualize
+
+01-3. Types of big data analysis
+
+descriptive analytics - describe/ summarize raw data
+    ex) google analytics tool - explain what happened in past
+
+predictive analytics - 
+    ex) SouthWest Airlines - identify pattern to predict possible error, so fix with lower input prior to error
+
+prescriptive analytics - provide advice
+    ex) Machine learning, train data, make recommendation (self-driving car)
+
+diagnostic analytics - understand why something happened in past
+    ex) time series of sales - explain why certain sale happened in that time
+
+02. Introduction to Hadoop
+
+
+
+    
