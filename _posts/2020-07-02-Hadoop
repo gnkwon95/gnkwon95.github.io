@@ -194,9 +194,32 @@ Each of these combine to create cluster - and clusters combine for bigger cluste
 06-1 different modes of cluster
 
 Multi-node cluster - same as above, with multiple node
-Pseudo distributed mode - all hadoop daemon on local machine
+    For actual production - divide task
+Pseudo distributed mode - all hadoop daemon on local machine 
+    to learn, to see how machine divides work
 Standalone Mode - no daemons, all run in single JVM
+    To check if it works - but no distribution works (single machine)
+    Can try logical separation
 
+06-2 Hadoop Ecosystem
 
+different tools for bigdata analysis
+Flume/ Sqoop - ingest data into processing system
+    Like funnel - Flume = unstructured
+    Sqoop = Excel sheet, etc - structured data
+HDFS, YARN - already explained
+hive (analytics)
+PIG - 1 PIG = 20 Mapreduce (powerful analytics)
+spark - near-realtime processing
+spark MLlib for ML
+Apache Ambari - manage and coordinate apache clusters
+OOZIe - schedule hadoop tasks
+Apache storm - for real-time computation (free, open source)
+Kafka - handle real-time info feed
+Solr, Lucene - searching and indexing
+
+No need to use all tools 
+
+07 Hadoop Installation
 
 
