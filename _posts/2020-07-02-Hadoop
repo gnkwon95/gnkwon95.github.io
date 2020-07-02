@@ -49,6 +49,154 @@ diagnostic analytics - understand why something happened in past
 
 02. Introduction to Hadoop
 
-
-
+Increase in customer order --> increase processors
+storage becomes new bottleneck --> increase storage (warehousing)
+Access to warehouse creates network overhead --> distributed and parallel approach
     
+Solution:
+Each processor does different task, parallel (Map) and merge (Reduce)
+Each processor given storage on its own (data locality)
+    In this case, if one storage/ processor breaks down, other parallel task covers
+    = What hadoop does
+This approach is scalable - can add/remove processor/ storage whenever necessary
+
+02-2. Apache Hadoop
+
+Allow storage and processing in parallel and distributed fashion
+HDFS = Hadoop distributed file system
+    Distribute main data to small storages accessible in parallel manner
+
+Map reduce = Allow parallel and distributed processing
+    Map = parallel tasking
+    Reduce = Combining parallel task
+
+Example of Apache Hadoop
+All procedure given 'back up' task to slave nodes (giver = master node) in case of error
+
+03 - HDFS
+
+Namenode = Master (manage all datanode)
+    
+Datanode = Slave (report/ send signal (heartbeat) to namenode)
+    Actual data is stored, in data node blocks
+    
+Metadata managed by fsImage and editLog
+fsImage = contain all modification made over Hadoop cluster, since creation of Namenode (high data, stored in disk)
+
+EditLog = only contain most recent changes, reside in RAM
+
+Secondary Namenode = get copy of editLog and fsImage to create new FsImage (updated)
+    Incorporate this onto original fsImage
+    Checkpointing happens periodically
+    Change during checkpointing saved in another editLog
+
+03-1 storing HDFS
+
+divide 380MB into 3 x 128 MB (each block size is limited to 128MB) - into each DataNode/ datablock
+    DataNode size may not be 128MB...? 1 TB? Hadoop distributes itself.
+    remaining part may be less than 128MB
+    Save space using this method
+    Scalability - can add DataNode if Namenode size increase
+    With distribution, parallel processing works - faster work
+
+03-2 Coping with Datanode Failure
+
+Replication factor - each datablock has three copies (one data is held in three datanode)
+
+03-3 Writing in Hadoop
+
+1. Pipeline setup
+    example.txt sends to smaller blocks
+    For each smaller block:
+    1.1 Client send Write request to Namenode (to copy block)
+    1.2 Namenode gives access by returning IP address of datanode (3 times, since replication factor is 3)
+    1.3 Check datanodes (all three) if they can be copied.
+        1.3.1 If there is no confirmation, go back to 1.2
+    1.4 This sets up pipeline - Data can be copied/ written to three datanodes
+
+2. Actual writing
+    1.1 Client contact Datanode 1, copy block, and datanode 1 contact datanode 2 to copy, and to datanode 3
+
+3. Acknowledgement
+    1.1 Pipeline ready, and writing is done
+    1.2 In reverse order, DN 3 confirm to DN2, and to DN1 that copy is successful.
+    1.3 DN1 confirm to client
+    1.4 Client send to Namenode that write is successful. 
+    1.5 Namenode update metadata
+
+Application to multiple blocks:
+Writing of two blocks happen at the same time
+    Writing itself (onto three) happen sequentially, but two blocks are parallel
+
+03-4 Reading HDFS
+
+1. Send namenode signal to read
+2. Receive IP addresses of datanodes
+3. Fetch and read from datanodes
+
+04 MapReduce
+
+Map = Divide into parallel-workable task
+Reduce = combine (sum up) all intermediate results (small overhead)
+
+Split - divide input to smaller parts
+Mapping - create each split parts to key-value pair (item, count)
+Shuffling - each keyword and its occurences (item, (1, 1)) or (item, (1, 1, 1))
+Reduce - sum up frequency of each word in each shuffled result
+Final result = Combine all reduced results - give (item, count) set
+
+Mapper code = Explain how key-value will be created
+Reducer code = how to merge aggregated output
+Driver code = configuration - job name, input/output path, etc
+
+05 YARN
+
+yet another resource negotiator - MapReduce version 2
+Resource Manager - Node Manager - app master - container
+    Container = CPU + RAM
+    App Master = check and manage MR
+
+05-1 MapReduce Job Workflow
+
+1. MR code -> MR job, order to run job (within client node)
+2. Client Node submits job to resource manager, on RM node
+3. RM Node gets application ID
+4.1. RMnode signals node manager to start container
+4.2 node manager launches app master for each app master
+    Application Master = daemon residing on data node and communicate to containers for executation of task on each data node
+5. Allocate resource, assigned by RM Node
+6. start container - YARN child runs map reduce task to get output
+
+Behind Mapreduce
+
+input -> map -> in-memory buffer (100MB default) -> (partition, sort, and spill to disk)
+-> merged to single partition and sorted file 
+Output from different mapping functiosn - all fetched to reducer for aggregation
+Aggregated results send to reduce
+
+05-2 YARN architecture
+
+1. Client send request to Resource Manager
+2. Ask node manager to launch App master (in each application, only launched with request)
+3. App master asks for resource from resource manager, RM provides
+4. App master also launch container, which does the map reduce
+
+05-3 HDFS & YARN
+
+Secondary Namenode -> Name node -> { Data Node -> Node Manager } (HDFS) - store
+Resource Manager -> {Node Manager -> Data Node} (YARN) - process
+
+06 Hadoop cluster and Hadoop ecosystem
+
+Each rack contain Namenode, secondary Namenode, multiple slave nodes
+Each of these combine to create cluster - and clusters combine for bigger clusters
+
+06-1 different modes of cluster
+
+Multi-node cluster - same as above, with multiple node
+Pseudo distributed mode - all hadoop daemon on local machine
+Standalone Mode - no daemons, all run in single JVM
+
+
+
+
