@@ -1,0 +1,219 @@
+---
+title: "Django"
+date: 2020-07-15
+categories: Python Django
+---
+
+해당 블로그는 https://docs.djangoproject.com/en/3.0/intro/tutorial01/ 를 통한 1회독 및 https://wikidocs.net/70650 를 보며 만들어지는 개인적인 장고 튜토리얼 강의 기록이다.
+ADE프로젝트 (멘토-멘티 매칭)를 기반으로 실습을 하며 학습 과정을 기록한다.
+
+* 1. 프로젝트 만들기
+
+
+이미 파이썬과 장고가 설치되어있다면, 프로젝트를 만드는것부터 시작된다. 다행히 장고 프레임에 필요한 기본 탬플릿 (init, admin, views, url 등)은 자동으로 생성된다.
+
+1.1 시작 코드:
+
+''' 
+django-admin startproject hr
+'''
+
+1.2 실행 코드:
+
+'''
+python manage.py runserver
+'''
+
+이후 localhost:8000 으로 웹 페이지를 열어볼 수 있다
+
+* 2. url
+
+메인페이지만 있는 웹사이트는 의미가 없다. 멘토 정보를 입력할 페이지를 추가해야한다.
+이때 수정할 순서는 1. 멘토 앱 만들기, 2. url 수정하기, 3. 멘토 앱 내 urls 수정하기 4. 멘토 앱 내 views 이다
+
+2.1. 멘토 앱 만들기
+
+manage.py가 있는 디랙터리에서 
+
+''' 
+django-admin startapp mentor
+'''
+를 수행하면 멘토 관련 앱이 생성된다. 이제 localhost:8000/mentor 이란게 생성됐으니 활용할 수 있을 것이다.
+
+
+2.2. url 수정하기
+
+hr/urls.py 파일을 보면 admin관련 url밖에 없음을 확인할 수 있다.
+'''
+path('mentor/', include('mentor.urls')),
+'''
+을 추가하면 멘토관련 페이지도 볼 수 있다. include를 사용하면 (import를 잊지 말자) mentor.urls.py란 곳에서 mentor/관련 url을 어떻게 처리하는지 확인할 수 있게된다.
+당연히, mentor.urls를 수정해주어야 한다
+
+2.3. 멘토 앱 내 urls 수정하기
+
+mentor폴더 내에 urls.py를 생성하고 
+
+'''
+from django.urls import path
+
+from . import views
+
+urlpatterns = [
+    path('', views.index),
+]
+'''
+
+를 추가한다. 지금과 같은 디랙터리에서 views.index를 확인하면 해당 url에 어떤 정보를 보여줄지를 찾을 수 있다고 알려준다. 
+그러니 views를 고쳐야한다
+
+2.4 멘토 앱 내 views.py 수정하기
+
+아래 내용을 입력하면 views.index가 할 일을 알려준다. - welcome to mentor page라고 출력한다
+
+'''
+from django.http import HttpResponse
+
+
+def index(request):
+    return HttpResponse("Welcome to mentor page")
+'''
+
+2.5 요약: 
+
+새로운 페이지 추가 관련 workflow는 아래와 같다
+1. startapp으로 앱을 만든다
+2. urls.py를 수정해서 새로운 앱 관련 url을 명시하고, 여기서 수행할 동작을 알려주는 파일을 알려준다 (혹은 그 위치로 포인트 한다)
+2.2 메인에서 명시하지 않고 다른곳에서 url동작을 명시하고자하면 해당 장소에 같은 urls.py를 만들면 된다. 포인터의 포인터 형식인데, 결국엔 views.py로 가게된다
+3. 새로 만든 앱의 views.py를 통해 수행할 동작을 함수로 만들어 입력한다
+
+* 3. 모델
+
+3.0 migrate
+
+모든 웹사이트의 활용은 DB에 저장되어야 한다. 디폴트로 만들어진 프로젝트는 sqlite기본 DB로 코드는 짜여져있지만 init되진 않은 형태이다. 
+그러니 아래를 실행해서 init한다. 그러면 DB (table)이 생성된다
+
+'''
+python manage.py migrate
+'''
+
+3.1 Model의 이해
+
+결국 특정 페이지는 무엇을 보여주는 (front) 활동 이전에 특정 작업/ interaction등이 일어난다. 이를 Model이라 한다.
+Model이 없으면 기입하는 정보가 DB에 저장이 되지 않고, 매번 같은 페이지로만 작동된다 (같은 문구 출력 등).
+예시에서는 질문-답변 관련 블로그가 주된 내용이다. 하지만 ADE프로젝트는 개인 프로필 기입이 주가 되고, 이와 관련된 다양한 신청링크/버튼을 넣는것이 핵심이다.
+이를 최대한 적용해서 변형된 웹사이트를 만들어보겠다. 우선, 개발의 편의를 위해 신청 링크/버튼등은 빼고 프로필 기입만 넣고자 한다.
+
+학습 목적도 있으니 Comment 클래스도 생성해서 여러 코멘트를 달 수 있게 하겠다.
+models.ForeignKey의 사용을 보고, 추후에 사용할 수 있다. 다만 이번에는 만들어놓긴 했지만 사용하진 않는다.
+(이때 이상한점이 예시에는 mentor/models.py 인데 내 파일에선 mentor/migrate/models.py이다.)
+
+https://docs.djangoproject.com/en/3.0/ref/models/fields/#field-types 로 다양한 인풋을 설정할 수 있다.
+
+'''
+from django.db import models
+
+class Profile(models.Model):
+    title = models.CharField(max_length = 100)
+    create_date = models.DateTimeField('date published')
+    school = models.CharField(max_length = 100)
+    workExperience = models.CharField(max_length = 200)
+    PR = models.TextField()
+    
+    def __str__(self):
+        return self.title
+
+class Comment(models.Model):
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE)
+    content = models.TextField()
+    create_date = models.DateTimeField()
+# Create your models here.
+'''
+
+3.2 settings.py 설정
+
+예시는 hr/settings.py인데 내 파일에선 hr/static/settings.py이다. 아마 bootstrap을 사전에 적용해서 그럴 것이다.)
+해당 파일에서 INSTALLED_APPS 내에 'mentor.apps.MentorConfig',을 추가한다. mentor/apps.py를 확인해보면 된다.
+
+3.3 migrate
+
+우선 model에 차이가 생겼으니 python manage.py makemigrations를 해서 변화를 업데이트 해준다. 실제 테이블에 변화를 주진 않는다.
+그리고 변화된 내용으로 python manage.py migrate를 입력한다. 
+
+이때 생성되는 파일 mentor.0001은 sql table의 변화 관련 내용들을 기록한다.
+
+python manage.py sqlmigrate mentor 0001을 입력하면 해당 테이블 형성 관련 명령어가 sql로 실행할 시 필요한 문구가 출력된다.
+
+3.4 Using model
+
+python manage.py shell 을 통해 model들과 관련된 생성/변경/조회 등을 할 수 있다.
+
+
+'''
+from mentor.models import Profile, Comment
+from django.utils import timezone
+
+p1 = Profile(title = '40회 탈락 후 합격!', school = 'SNU', workExperience = 'many interns', 
+PR = '인턴 정직원등 많이 떨어지다 결국 합격했습니다. 돌이켜보니 방법이 보이더라고요.
+알려드리고 싶습니다', create_date = timezone.now())   
+
+p1.save()
+'''
+를 실행하고
+'''
+p2 = Profile(title='바로합격', create_date=timezone.now(),
+school='IVY', workExperience='None', 
+PR='취업 그거 별거 없든데 ㅋㅋ')  
+
+p2.save()
+'''
+를 실행해서 두 멘토의 정보를 입력할 수 있다.
+참고로, p1, p2 대신 p를 여러번 써도 된다.
+
+Profile.objects.all()
+Profile.objects.filter(id=1)
+Profile.objects.get(id=1)
+Profile.objects.filter(title__contains('합격'))
+를 시도해볼 수 있다
+
+참고로, model에 새로운 내용을 추가한다면 (Profile 내에 author항목 추가) makemigrate, migrate를 다시 하면 된다.
+makemigrate시 새로 추가된 항목의 default값을 입력하라고 한다. 
+
+'''
+p = Profile.objects.get(id=2)
+p.author = '합격자2'
+p.save()
+'''
+
+를 통해 정보를 업데이트 할 수 있다
+
+'''
+p = Profile.objects.get(id=1)
+c = Comment(profile=p, content='인성터짐', create_date=timezone.now())
+c.save()
+''' 
+를 통해 코멘트도 추가할 수 있다.
+마지막으로,
+
+'''
+p = Profile.objects.get(id=1)
+p.comment_set.all()
+'''
+을 통해 코멘트들을 확인할 수 있다.
+
+3.5 요약
+
+Model은 DB에 정보를 입력하는 구조를 의미한다
+0. DB를 설정해야한다. 이번엔 기본 sqlite를 사용했으니 따로 가이드가 없이 default대로 간다
+1. mentor/models.py에 필요한 class들을 추가한다. 
+2. 메인폴더의 settings.py의 INSTALLED_APPS에 'mentor.apps.MentorConfig'를 추가한다.
+3. makemigrate, migrate로 DB의 테이블을 설정한다 (C 의 make, run과 같은 순서)
+4. shell을 통해 모델을을 만들고 변경하고 삭제한다
+이 과정의 4번은 매우 번거로다. 메인 개발자가 아니면 클래스를 손대지 못한단 말인가?
+이를 해결하기 위해 admin이 사용된다
+
+* 4. Admin
+
+
+
