@@ -1,0 +1,23 @@
+---
+title: "Django2"
+date: 2020-07-18
+categories: Python Django
+---
+
+해당 글은 이전에 https://wikidocs.net/70650 를 보며 쓴 1-7장 이후의 내용이다. (4-8장 내용은 저장이 되지 않아 8장부터 다시 작성한다.)
+
+## 8. Styling
+
+### 8.1 bootstrap 사용하기
+
+bootstrap은 html/ css에 기본적인 기능을 추가하여 디자이너 없이도 어느정도 구색을 갖춘 웹사이트를 만들게 해준다. 
+돈을 내고 더 화려한 bootstrap format도 살 수 있는 것 같지만, 우선 디폴트에 의존한다.
+
+boostrap을 검색해서 다운받고 static 파일 안에 bootstrap.min.css를 넣는다.
+그리고 시작은
+
+```
+{% load static %}
+<link rel="stylesheet" type="text/css" href = "{% static 'bootstrap.min.css' %}">
+```
+로 한다. 
