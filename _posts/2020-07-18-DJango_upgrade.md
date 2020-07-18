@@ -189,8 +189,8 @@ def sub(value, arg):
 조회가 몇개인지, 평점이 몇점인지도 이런식으로 입력이 가능할 것 같다.
 <a href= "{% ... <> {{profile.title}}</a} 아래에 이를 추가한다
 ```
-{% if profile.answer_set.count > 0 %}
-<span class="text-danger small ml-2"> {{profile.answer_set.count }}</span>
+{% if profile.comment_set.count > 0 %}
+<span class="text-danger small ml-2"> {{profile.comment_set.count }}</span>
 {% endif %}
 ```
 직관적인 사용방식이다.
