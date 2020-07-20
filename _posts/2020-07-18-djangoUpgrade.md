@@ -196,3 +196,295 @@ def sub(value, arg):
 직관적인 사용방식이다.
 
 
+## 5. 로그인/ 로그아웃
+
+서비스의 핵심이 될 수 있는 로그인/아웃 방식에 대한 코드다.
+
+### 5.0 기본 설정
+
+settings.py의 installed_apps에 자동으로 추가되는 django.contrib.auth 라를 툴을 사용한다.
+우선 hr/hr에 mentor폴더와 나란히 common이랑 app을 새로 만든다. (django-admin startapp common).
+(설명을 따라가다보면 settings.py가 들어있는 hr디랙터리의 이름이 config으로 되어있다.)
+config의 settings의 installed_apps에 'common.apps.CommonConfig',를 추가해준다.
+config의 urls에는 path('common/', include('common.urls'))를 추가한다. (mentor와 비슷)
+그리고 commons/urls.py에 mentor/urls.py와 비슷한 탬플릿을 준비해둔다.
+
+### 5.1 로그인 환경 설정
+
+우선 navbar.html의 href 에서 href="{% url 'common:login' %}" 를 수정해준다. 
+현재 #로 비움처리되어있는 부분에 실제 direct할 위치를 알려준다. 물론, 지금 common이란 app_name에 login은 없다.
+common/urls.py에 아래를 추가해준다.
+```
+from django.contrib.auth import views as auth_views
+path('login/', auth_views.LoginView.as_view(), name='login')
+```
+이 툴은 직접 login관련 페이지의 views.py함수를 만들 필요를 대신해준다.
+views 관련 함수들은 대신해주지만 시각화 탬플릿 (html)은 직접 제작해야한다.
+그러니 as_view 안의 내용을 auth_views.LoginView.as_view(template_name ='common/login.html') 로 지정한다. 이제 common/login.html을 쓰기만 하면 된다.
+
+예시에서 시키는 내용과 똑같이 입력한다.
+```
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container my-3">
+    <form method="post" class="post-form" action="{% url 'common:login' %}">
+        {% csrf_token %}
+        {% include "form_errors.html" %}
+        <div class="form-group">
+            <label for="username">사용자ID</label>
+            <input type="text" class="form-control" name="username" id="username"
+                   value="{{ form.username.value|default_if_none:'' ">
+        </div>
+        <div class="form-group">
+            <label for="password">비밀번호</label>
+            <input type="password" class="form-control" name="password" id="password"
+                   value="{{ form.password.value|default_if_none:'' }}">
+        </div>
+        <button type="submit" class="btn btn-primary">로그인</button>
+    </form>
+</div>
+{% endblock %}
+```
+
+보면 include "form_errors.html"이 있다. 작성한 기억이 없으니, 당연히 작성해준다.
+templages/form_errors.html에 아래와 같다
+```
+{% if form.errors %}
+    {% for field in form %}
+        {% for error in field.errors %}
+            <div class="alert alert-danger">
+                <strong> {{ field.label }}</strong>
+                {{ error }}
+            </div>
+        {% endfor %}
+    {% endfor %}
+    {% for error in form.non_field_errors %}
+        <div class="alert alert-danger">
+            <strong> {{error }}</strong>
+        </div>
+    {% endfor %}
+{% endif %}
+```
+이전에 멘토 등록 페이지와 제법 비슷하지만, 입력 시에도 다양한 이유로 에러 출력이 가능해진다. (예로 비번이 틀린다거나, 아이디가 없거나)
+전체적 코드의 흐름은 비슷하다.
+
+### 5.2 로그인 허용
+
+위와 같이 하면 로그인 페이지가 생기고, 입력이 잘못되면 오류를 출력한다.
+하지만 실제 로그인을 해주지는 않는다.
+성공적인 로그인은 django.contrib.auth 에 따라 /accounts/profile을 검색한다. 당연히, 지금 없다.
+
+우선, settings에 LOGIN_REDIRECT_URL = '/' 를 아무곳에나 추가해준다.
+이대로라면, 로그인이 성공하면 '/'로 redirect 해야한다. 하지만 기본 urls.py에 '/'는 없다.
+이를 추가해주자. 
+```
+from mentor import views
+path('', views.index, name='index'),
+```
+를 하면, redirect로 mentor의 views 의 index페이지로 간다.
+mentor 밑에 빨간줄이 생기면서 찾을 수 없다고 하는데... 수행은 잘 된다.
+
+로그인 이후에는 로그아웃할 수 있어야하니 navbar.html의 로그인 출력 란을
+```
+ {% if user.is_authenticated %}
+<a class="nav-link" href="{% url 'common:logout' %}"> {{user.username}}(로그아웃)</a>
+{% else %}
+<a class="nav-link" href="{% url 'common:login' %}">로그인</a>
+{% endif %}
+```
+로 대신한다.
+
+common/urls.py 에 ```path('logout/', auth_views.LogoutView.as_view(), name='logout'),``` 를 추가하고
+settings.py에 ```LOGOUT_REDIRECT_URL = '/'``` 를 추가하면 로그아웃도 구현이 된다.
+
+## 6. 계정 만들기
+
+이제 로그인을 할 수 있으니, admin 외의 계정들도 만들 수 있으면 좋겠다.
+
+### 6.1 링크 url 등 만들기
+우선, login.html에 계정 생성 글을 추가한다.
+
+```
+<div class="row">
+    <div class="col-4">
+        <h4>로그인</h4>
+    </div>
+    <div class="col-8 text-right">
+        <span>또는 <a href="{% url 'common:signup' %}">계정을 만드세요.</a></span>
+    </div>
+</div>
+```
+
+{% url 'common:signup' %}에 맞는 signup링크를 만들어야한다.
+common/urls.py 에 아래를 추가한다
+```
+path('signup/', views.signup, name='signup'),
+```
+### 6.2 아이디 등록하기
+
+이전에도, form을 받고 정보를 저장하기 위해서는 forms.py를 만들었다. 
+이번에도 해보자. common/forms.py를 만들고 아래를 만든다. (참고로, 위의 views/signup도 잊지 말자.미완성이다.)
+
+```
+from django import forms
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.models import User
+
+class UserForm(UserCreationForm):
+    email = forms.EmailField(label="이메일")
+
+    class Meta:
+        model = User
+        fields = ("username", "email")
+```
+UserCreationForm은 아이디-비번1-비번2 구조를 받고 비번1, 비번2가 같은지 확인해준다. 
+상식적으로 맞는 비밀번호가 입력되면 is_valid() 가 True가 된다.
+
+### 6.3 아이디 생성 관련 페이지 만들기
+
+드디어 views/signup의 차례다.
+이번에도 1. 페이지를 띄운다. 2. POST시 확인하고 다른 페이지로 돌린다. 두가지를 수행하는 signup view를 만들어야한다.
+```
+from django.shortcuts import render, redirect
+from django.contrib.auth import authenticate, login
+from common.forms import UserForm
+
+def signup(request):
+    if request.method == "POST":
+        form = UserForm(request.POST)
+        if form.is_valid():
+            form.save()
+            username = form.cleaned_date.get('username')
+            raw_password = form.cleaned_data.get('password1')
+            user = authenticate(username=username, password=raw_password)
+            login(request, user)
+            return redirect('index')
+    else:
+        form = UserForm()
+    return render(request, 'common/signup.html', {'form': form})
+```
+
+먼저, else를 보면 페이지를 기본으로 띄울때는 common/signup.html로 간다. 물론 아직 없는 페이지다.
+그리고 POST를 넣으면 UserForm class를 채워넣고, is_valid()이면 정보를 입력한 후 로그인하고, 메인페이지로 redirect한다.
+cleaned_data는 개별항목을 따로 받기 위해 쓴다고 하는데, 왜 쓰는지 사실 잘 모르겠다.
+
+이제 singup.html을 만들 차례다. templages/common/signup.html을 아래와 같이 채운다
+```
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container my-3">
+    <div class="row my-3">
+        <div class="col-4">
+            <h4>계정생성</h4>
+        </div>
+        <div class="col-8 text-right">
+            <span>또는 <a href="{% url 'common:login' %}">로그인 하세요.</a></span>
+        </div>
+    </div>
+    <form method="post" class="post-form">
+        {% csrf_token %}
+        {% include "form_errors.html" %}
+        <div class="form-group">
+            <label for="username">사용자 이름</label>
+            <input type="text" class="form-control" name="username" id="username"
+                   value="{{ form.username.value|default_if_none:'' }}">
+        </div>
+        <div class="form-group">
+            <label for="password1">비밀번호</label>
+            <input type="password" class="form-control" name="password2" id="password2"
+                   value="{{ form.password.value|default_if_none:'' }}">
+        </div>
+        <div class="form-group">
+            <label for="email">이메일</label>
+            <input type="text" class="form-control" name="email" id="email"
+                   value="{{ form.email.value|default_if_none:'' }}">
+        </div>
+        <button type="submit" class="btn btn-primary">생성하기</button>
+    </form>
+</div>
+
+{% endblock %}
+```
+계정생성 또는 로그인칸이 위에 있고
+form_errors를 포함한 form을 받는다. 사용자, 비밀번호, 이메일을 입력받고, 제일밑에 생성하기 버튼이 있다.
+
+이제 아이디를 자유롭게 만들 수 있다.
+
+## 7. 새로운 항목 만들기
+
+예시에서는 프로필을 올린 사람의 계정이 질문 옆에 추가되는 항목을 새로 만드는 것을 한다.
+이제 아이디가 생겼으니 당연히 질문자/ 답변자의 아이디를 추가할 수 있다.
+반대로 나는 이 외에 새로운 항목 여러가지를 추가하고자 한다. 
+당장 떠오르는것은
+1. 이전 이력을 단일항목에서 여러개 리스트로 추가하는것과
+2. 합격 기업-직군 및 불합격 기업-직군 리스트 작성하기
+이다. 물론 우선, 예시를 따라 먼저 아이디 입력을 추가하겠다.
+
+### 7.0 기본 설정 설명
+
+예시에는 author이 없기에 author을 추가한다. 
+하지만 나의 모델은 작성자의 id와 본명이 다르다. 그러기에 author은 그대로 두고, 원래 author의 이름을 user_id라고 하겠다.
+(원래 id를 쓰려고 했는데 기본설정값이라 사용하지 못하는 것 같다)
+하지만 노출되는 이름은 의도대로 id 가 아닌 author로 하겠다.
+
+### 7.1 models.py 수정
+
+오랜만에 mentor/models.py에 돌아와서 항목을 추가하자. (Profile 부분)
+```
+from django.contrib.auth.models import User
+user_id = models.ForeignKey(User, on_delete=models.CASCADE)
+```
+를 추가한다.
+
+그리고 python manage.py makemigrations 후 python manage.py migrate를 수행한다.
+무언가 에러 비스무리한게 뜨는데, 처리법은 앞서 이미 다뤘다.
+
+비슷하게 comment에 추가한다.
+
+### 7.2 views.py 수정
+
+그럼 이제 user_id가 노출될 수 있게 설정을 바꿔보자.
+profile_create, comment_create 함수 중 if form.is_valid() 안에 아래와 같이 추가한다
+```
+profile.user_id = request.user
+```
+
+### 7.3 login required
+
+하지만 로그인이 되어있지 않다면, 에러가 출력될 것이다 (당연하다)
+comment_create, profile_create 위에 아래와 같이 추가해준다.
+```
+@login_required(login_url='common:login')
+```
+물론 from django.contrib.auth.decorators import login_required 로 import가 필요한다.
+안에 login_url을 넣어주며 이 에러가 출력될 시 로그인 페이지로 가이드해줄 수 있다.
+또한 이 페이지를 통해 redirect 되어 로그인을 하면 처음부터가 아닌 해당 페이지로 다시 갈 수 있다.
+url 에서 ?next=/ ~~~ 구문을 통해 다음페이지를 확인할 수 있다.
+
+하지만 url이 해당 글처럼 된다고 바로 실행되지는 않는다. 이를 수정할 수 있다.
+login.html에서, csrf_token 다음, include form errors 전에 아래와 같이 추가한다.
+```
+<input type="hidden" name="next" value="{{ next }}"
+```
+
+### 7.4 로그인 없는 후기 방지
+
+생각해보면, 글 작성은 애초에 로그인하지 않으면 '작성하기'를 할 수 없으니 form페이지에 접근도 못한다.
+하지만 후기는 로그인하지 않아도 form에 접근할 수 있고, 글을 쓴 후 '제출'을 해야 로그인을 요구한다.
+UI가 매우 나쁠 것 같으니, 로그인하지 않으면 후기를 아예 쓰지도 못하게 하고싶다.
+
+profile_detail.html 에서 후기 관련 textarea 부분에 if문을 추가해보자.
+```
+<textarea {% if not user.is_authenticated %}disabled{% endif %} name="content" id="content" class="form-control" rows="10"></textarea>
+```
+
+### 7.5 기존 이력 변경하기
+
+이번엔 기존에 배운 내용을 응용할 것이다. 
+현재 mentor/models.py를 보면 workExperience가 models.CharField()로 하나의 입력이 되어있다. 
+리를 길이가 제한된 리스트로 바꿀 수 없을까?
+
+
+
