@@ -1,5 +1,5 @@
 ---
-title: "Django_upgrade"
+title: "DjangoUpgrade"
 date: 2020-07-18
 categories: Python Django
 ---
