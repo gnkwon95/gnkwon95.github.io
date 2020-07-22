@@ -486,5 +486,328 @@ profile_detail.html 에서 후기 관련 textarea 부분에 if문을 추가해�
 현재 mentor/models.py를 보면 workExperience가 models.CharField()로 하나의 입력이 되어있다. 
 리를 길이가 제한된 리스트로 바꿀 수 없을까?
 
+## 7장 나머지와 8장, 9장 초반이 또 저장이 안됐다... 9장 중간부터 이어서 작성한다.
+
+### 9.2 수정 버튼 만들기
+
+이제 글을 수정할 권한을 주자. 본인의 글만 수정할 수 있으니 if문을 사용하고, 이때엔 버튼을 추가한다.
+아래는 profile_detail.html
+```
+ {% if request.user == profile.user_id %}
+<div class="my-3">
+    <a href = "{% url 'mentor:profile_modify' profile.id %}"
+       class="btn btn-sm btn-outline-secondary">수정</a>
+</div>
+ ```
+ 이전에 말한대로 author는 글쓴이의 이름 (중복가능), user_id는 고유값이므로 author이 아닌 user_id를 쓴다.
+ 
+ ### 9.3 url, views 편집
+ 
+ mentor/urls.py 에 
+ ```path('profile/modify/<int:profile_id>/', views.profile_modify, name='profile_modify'),```
+ 를 추가하고
+ 
+ views.py에는 아래를 추가한다.
+ 
+ ```
+ from django.contrib import messages
+ 
+ @login_required(login_url = 'common:login')
+def profile_modify(request, profile_id):
+    profile = get_object_or_404(Profile, pk=profile_id)
+    if request.user != profile.author:
+        messages.error(request, '수정권한이 없습니다')
+        return redirect('mentor:detail', profile_id=profile.id)
+
+    if request.method == "POST":
+        form = ProfileForm(request.POST, instance=profile)
+        if form.is_valid():
+            profile=form.save(commit=False)
+            profile.user_id = request.user
+            profile.modify_date=timezone.now()
+            profile.save()
+            return redirect('mentor:detail', profile_id=profile.id)
+    else:
+        form = ProfileForm(instance=profile)
+    context = {'form': form}
+    return render(request, 'mentor/profile_form.html', context)
+ ```
+ 우선, 권한이 없을 시 수정권한이 없습니다를 출력해준다. 
+ else(get) 에서는 ProfileForm페이지가 호출되고, 저장하기 버튼을 누르면 (POST) 데이터를 저장하고 redirect한다.
+ 
+ GET에서 instance=profile은 ProfileForm에서 기존에 채워져있는 데이터가 수정 전 형태가 될 수 있게 함을 뜻한다.
+ POST에서는 instance=profile로 하되 request.POST부분을 후에 덮어씌운다.
+ 
+ ### 9.4 비슷하게 삭제 만들기
+ 
+ 우선 html을 수정한다. 기존 수정 글 밑에 아래 코드를 붙이면 삭제 버튼도 같이 생긴다.
+ 
+ ```
+ <a href="#" class="delete btn btn-sm btn-outline-secondary"
+data-uri="{% url 'mentor:profile_delete' profile.id %}">삭제</a>
+```
+ class에 삭제항목을 추가했고
+ data-uri를 통해 jQuery를 가져온다. profile_delete 함수를 만들어야한다.
+ 
+ ### 9.5 jQuery 사용하기
+ 
+ javascript는 유저와 interaction이 가능하게 하는 입체적인 코드다.
+ 삭제 버튼을 누르면 확인을 하고, 여기서 확인이 되면 정말 삭제하는 코드를 만들 수 있다.
+ 우선 jQuery를 사용하기 위해 기본 html에 이를 허락해주는 코드를 짜야한다.
+ 
+ base.html아래부분에 아래 코드를 추가하자.
+ 
+```
+{% block script %}
+{% endblock %}
+```
+ script 관련 코드를 base.html의 연장된 html에서 사용하겠다는 뜻이다.
+ 참고로, jQuery 3.5.1은 이전에 이미 가져왔다. 다만 이와 관련된 코드를 쓰겠다고 선언을 안했을 뿐이다.
+ 
+ 
+ 아래는 필요한 jQuery 코드이다. 이를 profile_detail.html 끝부분에 추가해주면 된다.
+ ```
+ {% block script %}
+<script type='text/javascript'>
+$(document).ready(function(){
+    $(".delete").on('click', function() {
+        if(confirm("정말로 삭제하시겠습니까?")) {
+            location.href = $(this).data('uri');
+        }
+    });
+});
+</script>
+{% endblock %}
+ ```
+ javascript형태를 가져오고, 화면 로드 시 바로 사용되는 jQuery (확인 버튼 출력 시 나오는) 경우에 .delete함수가 적용되고, 클릭으로 작동한다.
+ 정말 삭제하겠습니다 버튼에 confirm을 누르면 기존 ui로 다시 돌아간다.
+ 
+ ### 9.6 노가다 반복
+ 
+ mentor: profile_delete를 사용한다고 했으니, 관련 url을 만들어준다.
+ ```
+ path('profile/delete/<int:profile_id>/', views.profile_delete, name='profile_delete'),
+```
+
+그리고 관련 함수를 views.py에 만들어준다.
+```
+
+@login_required(login_url='common:login')
+def profile_delete(request, profile_id):
+    profile = get_object_or_404(Profile, pk=profile_id)
+    if request.user!= profile.user_id:
+        messages.error(request, '삭제권한이 없습니다')
+        return redirect('mentor:detail', profile_id=profile.id)
+    profile.delete()
+    return redirect('mentor:index')
+```
+클래식하게 권한이 없으면 제한하고, 아니면 delete()를 적용한다. 
+이번에도 author이 아닌 user_id를 사용한다.
+
+```
+    path('comment/modify/<int:comment_id>/', views.comment_modify, name='comment_modify'),
+```
+를 url에 추가해주고
+
+views.py에 comment_modify 함수도 만들어준다. profile_modify와 거의 같다.
 
 
+그리고 profile_form과 달리 comment_form은 따로 있지 않다.
+프로필 상세페이지에서 바로 질문을 붙였기때문에 따로 form만을 위한 html을 만들지 않았다.
+그래서 만든다. comment_form.html
+
+```
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container my-3">
+    <form method="post" class="post-form">
+        {% csrf_token %}
+        {% include "form_errors.html" %}
+        <div class="form-group">
+            <label for="content">후기내용</label>
+            <textarea class="form-control" name="content" id="content" rows="10">
+                {{form.content.value|default_if_none:'' }}
+            </textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">저장하기</button>
+    </form>
+</div>
+
+{% endblock %}
+```
+
+## 10. 대댓 만들기
+
+대댓도 만들 수 있다. 오랜만에 models함수에 새로운 class를 추가하고, 데이터의 구조를 크게 바꿀 계획이다.
+
+
+### 10.1 models.py 클래스 생성
+```
+class Repl(models.Model):
+    user_id = models.ForeignKey(User, on_delete=models.CASCADE)
+    content=models.TextField()
+    create_date=models.DateTimeField()
+    modify_date=models.DateTimeField(null=True, blank=True)
+    profile = models.ForeignKey(Profile, null=True, blank=True, on_delete=models.CASCADE)
+    comment = models.ForeignKey(Comment, null=True, blank=True, on_delete=models.CASCADE)
+```
+위와 같은 새로운 클래스를 만들고, 이름을 리플로 한다. 프로필, 코멘트를 그대로 가져오고 user_id도 가져온다.
+on_delete를 통해 상위 개념이 사라지면 하위 개념들도 모두 사라지게 된다. 글이 사라지거나 댓글이 사라지면 대댓도 사라진다.
+
+migrations를 수행 한다.
+
+### 10.2 노가다 수행
+
+1. html에 버튼 추가
+2. urls.py 매핑
+3. forms.py 작성 (필요 없으면 생략)
+4. views.py에 함수 작성
+5. 4번에서 사용하는 탬플릿이 있다면 작성
+
+이 순서대로 하면 된다. 자세한 내용은 코드를 참고한다.
+
+#### profile_detail.html 추가
+
+```
+        {% if profile.repl_set.count > 0 %}
+        <div class="mt-3">
+            {% for repl in profile.repl_set.all %}
+            <div class="repl py-2 text-muted">
+                <span style="white-space: pre-line;"> {{repl.content}}</span>
+                <span>
+                    - {{ repl.user_id }}, {{repl.create_date}}
+                    {% if repl.modify_date %}
+                    (수정:{{repl.modify_date}})
+                    {% endif %}
+                </span>
+                {% if request.user == repl.user_id %}
+                <a href="{% url 'mentor:repl_modify_profile' repl.id %}" class="small">수정</a>
+                <a href="#" class="small delete" data-uri="{% url 'mentor:repl_delete_profile' repl.id %}">삭제</a>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    <a href="{% url 'mentor:repl_create_profile' profile.id %}" class="small"><small>댓글 추가 ..</small></a>
+</div>
+```
+마지막줄에 위 클래스를 보면 class="repl..." 부분이 있다. repl 라는 클래스는 bootstrap에 있지 않다. style.css에 만들어야한다.
+
+```
+.repl {
+    border-top:dotted 1px #ddd;
+    font-size:0.7em;
+}
+```
+이를 추가해준다.  위에 점선을 추가하고 폰트 사이즈가 0.7em이 된다. 점선의 색은 #ddd 이다.
+
+#### urls.py
+
+사용된 url은 수정/ 삭제/ 댓글추가 기능들이다. 각자 href를 사용하니, 이들의 url과 함수들을 모두 작업해야한다.
+
+```
+    path('repl/create/profile/<int:profile_id>/', views.repl_create_profile, name='repl_create_profile'),
+    path('repl/modify/profile/<int:repl_id>/', views.repl_modify_profile, name='repl_modify_profile'),
+    path('repl/delete/profile/<int:crepl_id>/', views.repl_delete_profile, name='repl_delete_profile'),
+```
+댓글 등록에는 어디 등록하는지 (profile_id)가 필요하고 수정 삭제는 해당 대댓(repl_id)이 필요하다.
+
+#### forms.py
+
+CommentForm과 비슷한 아래 클래스를 만든다. (import Repl 잊지말자)
+```
+class ReplForm(forms.ModelForm):
+    class Meta:
+        model = Repl
+        Fields = ['content']
+        labels = {
+            'content': '대댓내용',
+        }
+```
+
+#### views.py
+
+이제 views를 작업해야한다. (import CommentForm) 잊지말자
+
+
+```
+@login_required(login_url='common:login')
+def repl_create_profile(request, profile_id):
+    profile = get_object_or_404(Profile, pk=profile_id)
+    if request.method == "POST":
+        form = ReplForm(request.POST)
+        if form.is_valid():
+            repl = form.save(commit=False)
+            repl.create_date = timezone.now()
+            repl.profile = profile
+            repl.user_id = request.user
+            repl.save()
+            return redirect('mentor:detail', profile_id=profile.id)
+    else:
+        form = ReplForm()
+    context = {'form': form}
+    return render(request, 'mentor/repl_form.html', context)
+```
+
+다음으로는 repl_modify_profile와 repl_delete_profile을 작성한다.
+
+comment_modify 와 comment_delete을 복붙해서 조금만 수정했다. 새로운 개념은 없다.
+
+```
+@login_required(login_url='common:login')
+def repl_modify_profile(request, repl_id):
+    repl = get_object_or_404(Repl, pk=repl_id)
+    if request.user != repl.user_id:
+        messages.error(request, '댓글수정권한이 없습니다')
+        return redirect('mentor:detail', profile_id=repl.profile.id)
+
+    if request.method == "POST":
+        form = ReplForm(request.POST, instance=repl)
+        if form.is_valid():
+            repl = form.save(commit=False)
+            repl.user_id = request.user
+            repl.modify_date = timezone.now()
+            repl.save()
+            return redirect('mentor:detail', profile_id=repl.profile.id)
+    else:
+        form = ReplForm(instance=repl)
+    context = {'form': form}
+    return render(request, 'mentor/repl_form.html', context)
+
+@login_required(login_url='common:login')
+def repl_delete_profile(request, repl_id):
+    repl = get_object_or_404(Repl, pk=repl_id)
+    if request.user!= repl.user_id:
+        messages.error(request, '댓글삭제권한이 없습니다')
+        return redirect('mentor:detail', profile_id=repl.profile_id)
+    repl.delete()
+    return redirect('mentor:index', profile_id=repl.profile_id)
+```
+
+#### comment_form.html
+
+comment_form으로 대댓 인풋을 받으니 이 문서도 만들어준다.
+
+```
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container my-3">
+    <h5 class="border-bottom pb-2">댓글달기</h5>
+    <form method="post" class="post-form my-3">
+        {% csrf_token %}
+        {% include "form_errors.html" %}
+        <div class="form-group">
+            <label for="content">댓글내용</label>
+            <textarea class="form-control" name="content" id="content" rows="3">
+                {{form.content.value|default_if_none:'' }}
+            </textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">저장하기</button>
+    </form>
+</div>
+
+{% endblock %}
+```
