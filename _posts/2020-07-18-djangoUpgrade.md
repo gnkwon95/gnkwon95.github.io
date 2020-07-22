@@ -887,7 +887,7 @@ comment의 경우 아래와 같은 수정도 필요하다.
 우선 탬플릿에 추천 관련 버튼을 만들어야한다. 다행히 class=recommend가 있으니 활용할 수 있다.
 예시와는 조금 다른 방식을 채택했는데, 짧은 질문이 아니고 긴 자기소개가 되기에 아래처럼 추천만 간단히 넣었다
 
-```
+``` ## 해당부분은 후에 살짝 조정함.
 <div class="row my-3"> <!-- 상단부분 구분 -->
     <div class="col-1"> <!-- 왼쪽 1의 비중을 추천으로 두고 -->
         <div class="bg-light text-center p-3 border font-weight-bolder mb-1">{{profile.voter.count}}</div>
@@ -929,12 +929,15 @@ vote_profile 함수 - 본인이 본인 글 추천을 못하게 한다. 그리고
 @login_required(login_url='common:login')
 def vote_profile(request, profile_id):
     profile = get_object_or_404(Profile, pk=profile_id)
-    if request.user == profile.author:
+    if request.user == profile.user_id:
         messages.error(request, "본인이 작성한 글은 추천할 수 없습니다")
     else:
         profile.voter.add(request.user)
     return redirect('mentor:detail', profile_id=profile.id)
 ```
+본인은 직접 추천할 수 없게 설정을 하고 
+profile.voter.add를 한다. 여기서 add는 기본으로 vote관련 주어진 함수로 1을 추가하고, 한 request.user당 한번밖에 누르지 못하게 한다.
+
 messages를 어떻게 출력할지도 html에서 지정할 수 있다.
 
 ```
@@ -947,6 +950,283 @@ messages를 어떻게 출력할지도 html에서 지정할 수 있다.
     </div>
     {% endif %}
 ```
+### 12.5 댓글 좋아요
+
+메인 글과 비슷하게 하면 된다. 메인 글에서는 좋아요 밑에 글이 나왔지만, 후기에는 좋아요 옆에 글이 나오면 (원래 코드와 같으면) 좋을 것 같다.
+우선, html부터 손보자.
+
+```
+{% for comment in profile.comment_set.all %}
+    <div class="row my-3"> <!-- 수정 부분 - 일단 row 3을 먼저 고정한다 -->
+        <div class="col-1"> <!-- 왼쪽 부분을 col-1로 나누고, 여기에 vote comment 내용을 넣는다 -->
+            <div class="bg-light text-center p-3 border font-weight-bolder mb-1">{{comment.voter.count}}</div>
+            <a href="{% url 'mentor:vote_comment' comment.id %}" class="recommend btn btn-sm btn-secondary btn-block my-1">추천</a>
+        </div>
+        <div class="col-11"> <!-- 이후 오른쪽 영역을 col-11로정의하고, 그 안에 카드/ 카드안에 후기들을 넣는다 -->
+            <div class="card">
+                <div class="card-body">
+                    <div class="card-text" style="white-space: pre-line;">{{comment.content}}</div>
+                    <div class="d-flex justify-content-end">
+                        <div class="badge badge-light p-2 text-left">
+                            <div class="mb-2">{{comment.user_id}}</div>
+                            <div>{{comment.create_date}}</div>
+                        </div>
+                    </div>
+                    {% if request.user == comment.user_id %}
+                    <a href="{% url 'mentor:comment_modify' comment.id %}" class="btn btn-sm btn-outline-secondary">수정</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+```
+이런 모양이 나온다. 
+
+### 노가다 반복
+
+urls.py에 
+
+``` path('vote/comment/<int:comment_id>/', vote_views.vote_comment, name='vote_comment'), ```
+를 추가하고
+
+comment_views.py에 아래 코드를 넣는다
+
+```
+@login_required(login_url='common:login')
+def vote_comment(request, comment_id):
+    comment = get_object_or_404(Comment, pk=comment_id)
+    if request.user == comment.user_id:
+        messages.error(request, '본인이 작성한 글은 추천할 수 없습니다')
+    else:
+        comment.voter.add(request.user)
+    return redirect('mentor:detail', profile_id=comment.profile.id)
+```
+이러면 의도한 디자인이 나온다!
+
+## 13. 앵커 만들기
+
+스크롤을 돌리고, 다른 곳으로 튀었다가 돌아오면 맨 위가 아닌 이전 위치 혹은 그에 가까운곳으로 호출하고싶다.
+이를 앵커라고 한다. 꼭 지금수준에서 필요한지 모르지만 일단 만들자.
+
+### 13.1 html
+
+profile_detail.html에 아래를 추가한다
+``` <a name="comment_{{comment.id}}"></a> ```
+여기에 앵커 고유의 이름이 저장되는 것이다.
+
+### 13.2 views
+
+comment_views.py에서 redirect를 포맷팅을 이용해 아래와 같이 바꾼다.
+
+```
+return redirect('{}#comment_{}'.format(
+                resolve_url('mentor:detail', profile_id=profile.id), comment.id))
+```
+comment_create, comment_modify 둘 다 적용한다. 살짝 다른것을 확인할 수 있지만, 쉽게 이해할만하다.
+
+### 13.3 대댓
+
+예시글은 대댓에도 이를 적용하지만, 우리는 대댓이 없으므로 무시한다. 다음으로 넘어가자.
+
+## 14. 마크다운
+
+마크다운은 글씨에 포맷팅을 해주는 것이다. 지금 깃헙에 쓸때 제목에 ## 를 쓰거나 * 를 쓰면 포맷이 바뀌는 것과 같다.
+이 기능을 제공하면 글쓴이가 편할 수 있지만, 이 기능을 제대로 아는 사람이 몇명이 될지 모르겠다 (이게 노션도 아니고...)
+그래도 혹시 이를 나중에 수기로 적용할 수 있게 추가하거나..? 할 수 있으니 일단은 만들어보자. 
+
+아니다. 이게 블로그도 아니고.. 나중에 추가하자 그딴건.
+
+## 15. 검색창
+
+이건 필요하다. 검색을 해야하지 않겠나.
+나중에 전체/ 제목/ 글쓴이/ 기업/ 자기소개글 등으로 검색 세분화가 가능하겠지만, 우선은 짬뽕된 or 함수에 집중하다.
+
+### 15.1 profile_list.html
+
+오랜만에 프로필 검색 리스트 페이지를 보자. 상단에 아래를 추가해주자. 검색창 input을 받고, kw를 받는다. 검색한 value는 kw로 입력받고 이를 검색한다.
+
+```
+<div class="row justify-content-end my-3"> <!--검색창 -->
+        <div class="col-4 input-group">
+            <input type="text" class="form-control kw" value="{{ kw|default_if_none:'' }}">
+            <div class="input-group-append">
+                <button class="btn btn-outline-secondary" type="button" id="btn_search">찾기</button>
+            </div>
+        </div>
+    </div>
+```
+
+그리고 페이지의 제일 마지막, endblock 전에 아래와같은 form을 넣어준다
+
+```
+<form id="searchForm" method="get" action="{% url 'index' %}">
+    <input type="hidden" id="kw" name="kw" value="{{kw|default_if_none:'' }}">
+    <input type="hidden" id="page" name="page" value="{{page}}">
+</form>
+```
+
+index라는 함수가 kw, page 값을 저장하고 context로 전달해준다.
+
+또한 기존 페이지처리는 링크를 href=?page ~~~ 식으로 읽어오게 되어있다.
+이를 data-page를 써서 자유롭게 바뀌도록 (?) 한다. 직접 페이지값에 이름을 부여하지 않고 page-data 속성을 부여해서 이를 통해 값을 읽는 형식이다.
+
+### 15.2 profile_list javascript
+
+동적 계산이 필요하기 때문에 javascript를 사용한다. block script와 endblock 사이에 작성된다.
+
+```
+{% block script %}
+<script type='text/javascript'>
+    $(document).ready(function(){
+        $(".page-link").on('click', function(){
+            $("#page").val($(this).data("page"));
+            $("#searchForm").submit();
+        });
+        
+        $("#btn_search").on('click',function(){
+            $("#kw").val($(".kw").val());
+            $("#page").val(1);
+            $("#searchForm").submit();
+        });
+    });
+</script>
+{% endblock %}
+```
+이부분은 새로운 분야라 조금 설명이 필요하다.
+
+우선 <a class="page-link"...> 부분을 보면 page-link란 class에 접근시의 인풋이 주어진다.
+여기 스크립트에서 $(".page-link") 부분이 해당 함수가 활성화 (ready) 되면 특정 script 관련 함수를 수행하라는 것을 의미한다.
+
+그리고 검색버튼을 클릭하면 $("#btn_search") 이 on (click) 될때 특정 함수를 수행하도록 되어있다.
+각각 무언가 함수 수행을 하고 특정 Form을 활성화 (submit) 한다.
+
+val(1)은 무언가 검색하면 늘 1페이지로 노출되도록 설정하는 것이다.
+
+### 15.3 base_views.py
+
+이제 이 함수들을 적용할 기본페이지에 함수들을 추가하면 된다.
+
+index 함수의 첫부분을 아래처럼 수정해준다
+```
+page = request.GET.get('page', '1') #페이지
+    kw = request.GET.get('kw', '') #검색어 추가
+    
+    profile_list = Profile.objects.order_by('-create_date')
+    if kw:
+        profile_list=profile_list.filter(
+            Q(title__icontains=kw) |
+            Q(school__icontains=kw) |
+            Q(workExperience__icontains=kw) |
+            Q(PR__icontains=kw) |
+            Q(comment__user_id__username__icontains=kw) 
+        ).distinct()
+ <...>
+ context={'profile_list': page_obj, 'page': page, 'kw': kw}
+```
+하위 모델속성을 보기 위해서는 __ (언더바 두개)를 사용하고, html에 page 와 kw도 넘겨주기 때문에, 이도 context에 추가해준다.
+왜인지 모르겠지만 comment__content__icontains=kw는 에러가 나온다. 
+    
+### 15.4 정렬하기
+
+검색이 가능하다면, 비슷하게 page, kw, get, jquery등을 활용해서 정렬도 가능할것이다.
+
+우선 정렬 기준을 볼 수 있게 해보자. 아래를 상단에 넣으면 3개 옵션이 있는 간단한 form을 쓸 수 있다. 셋중 하나를 드롭다운으로 검색할 수 있어진다.
 
 
+```
+<div class="col-2">
+    <select class="form-control so">
+        <option value="recent" {%if so == 'recent' %}selected{% endif %}>최신순</option>
+        <option value="recommend" {%if so == 'recommend' %}selected{% endif %}>추천순</option>
+        <option value="popular" {% if so == 'popular' %}selected{% endif %}>인기순</option>
+    </select>
+</div>
+```
+그리고 아래에, searchForm에 해당되는 숨겨진 타입중에 so를 통한 searchForm도 추가해주자.
 
+```
+<input type="hidden" id="so" name="so" value="{{so}}">
+```
+
+아래 자바스크립트부분의 ready function 에도 아래와 같이 so에 해당하는 script를 추가해준다.
+
+```
+$(".so").on('change', function() {
+    $("#so").val($(this).val());
+    $("#page").val(1);
+    $("#searchForm").submit();
+});
+```
+
+### 15.5 base_views.py의 index함수 수정하기
+
+아까와 같이 함수를 수정해주어야한다. 각자 버튼을 누르면 어떤 일을 할지 (정렬, 어떤 기준) 알려줘야한다.
+이제 검색 기준이 생겼으니, order_by의 순서에 따른 profile_list가 매번 다르게된다.
+코드는 아래와 같다.
+
+```
+so = request.GET.get('so', 'recent') #정렬 기준
+
+if so == 'recommend':
+    profile_list = Profile.objects.annotate(num_voter=Count('voter')).order_by('-num_voter', '-create_date')
+elif so=='popular':
+    profile_list=Profile.objects.annotate(num_comment=Count('comment')).order_by('-num_comment', '-create_date')
+else: #recent
+    profile_list=Profile.objects.order_by('-create_date')
+```
+정렬기준을 추가하고, 디폴트로 recent가 되어있다. 
+하지만 get을 통해 다른게 될 수 있다. 
+그리고 투표수가 같으면 최신순으로 정렬되도록 두가지 목적을 두었다.
+annotate의 사용방법은 쿼리와 비슷해보여서 어렵지 않고, 결국 order_by가 정렬기준이다.
+보면 인기순은 후기순으로 정렬되어있다. 그냥 헷갈리지 않게 후기순으로 해야겠다.
+끝에 content에 so를 추가해주는것을 빼먹지 않는다.
+
+사용해보면 정렬 필터를 넣고, 검색 필터도 넣을 수 있다.
+작동 원리는 조금 복잡하지만 코드 자체는 매우 간단하다.
+
+## 16. 추가 기능
+
+생각하는 추가 기능은 아래와 같다.
+
+1. 답변 페이징/ 정렬 (지금은 최신순. 메인페이지처럼 한페이지에 10개만 들어가게 변경, 좋아요 순 등으로 정렬)
+
+2. 카테고리 
+	2.1 하나의 자유게시판에서 인턴/정규직/이직 등 카테고리 나누기
+	2.2 상단바에 다른 내용 추가 (채팅이 되겠지)
+
+3. 비밀번호 분실과 변경/ 아이디...
+	3.1 내 페이지 내에서 아이디/ 비번 변경
+	3.2 비번 찾기는 이메일로 임시 비번 보내야함. 어려움
+
+4. 프로필 만들기
+	4.1 여기에 아디비번 바꾸기 링크 추가
+	4.2 자기소개글, 올린 글/댓글 수, 최근접속 등 추가
+	4.3 유저가 자기 개인 사진 업로드할 수 있게 기능 추가
+
+5. 최근 답변, 최근 댓글
+	5.1 비교적 쉬운데, 게시판이 아니니 필요 없을수도
+
+6. 조회수 표시
+	6.1 일단 조회도 트레킹 해야하는데... 어떻게 하지.
+	6.2 조회순으로 정렬 기능 추가
+	6.3 조회 수 실시간으로 바뀌는 칼럼 메인에 추가
+
+7. 소셜 로그인
+	7.1 소셜미디어로 로그인 가능하게 하기
+
+8. 채팅 서비스 구현하기 (상단 바에서)
+
++ 멘토 정보 입력란 업데이트 (리스트로 해서 jQuery 얹기. 자격증+점수 or 경험+년도)
++ 멘토 프로필 나눠서 보기 - 네이버쇼핑처럼 맨 위에는 자기소개와 여기저기 정보 왔다갔다 할 수 있는 탭 추가
++ 회원가입시 약관동의/ 개인정보 확인
++ 전화번호로 확인문자 보내기
++ 연락 신청하기
++ 멘토 정보 등록 시 승인 대기 기능 (바로 올라가지 않게)
++ 멘토 자기 정보 검증 기능 추가하기 - 당장은 지인 위주로 해서 자격증 확인 제출란은 필요 없을듯
++ 슈퍼계정 만들어서 승인해줄 수 있게 하기
++ 멘토 available 확인 및 기능 추가하기 - on/off 까지는 아니어도 어느날에 되는지.. UI좀 고민해봐서 달력에 회색/초록색 표시를 하거나 등
++ 멘토 멘티 계정 구분하기 - 회원가입 시 두개로 갈라서. 어떻게 UI 다를지도 괸
++ 멘티 계정 멘토계정으로 전환할 수 있는 UI 추가하기
+
+정말 많구나... 화이팅..
