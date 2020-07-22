@@ -811,3 +811,142 @@ comment_form으로 대댓 인풋을 받으니 이 문서도 만들어준다.
 
 {% endblock %}
 ```
+
+이와 관련해서는 코드를 다 작성했으나 ADE프로젝트의 UI에는 필요하지 않아 전부 주석처리하고 넘어가겠다.
+대댓 기능으로 피보팅해서 시도하려고 했으나 불필요하다고 느꼈고, 대댓버튼을 누르면 작은 form칸일 생기는 UI를 제작하기 난해해서 스킵한다.
+
+## 11. views.py 정리
+
+views.py파일에 상당히 많은 내용이 들어가고, 협업 시 작동이 어려울 수 있으니 파일들을 구분하겠다.
+또한 예시에서는 두가지 방식을 알려주는데, 협업에 두번째 방식이 더 좋다고 하니 두번째 방식을 채택한다.
+
+### 11.1 폴더 구분
+
+mentor 내에 views 라는 폴더를 만들고 base_views, profile_views, comment_views로 나눈다
+주석처리한 repl_views 내용은 base_views에 그대로 둔다.
+
+### 11.2 urls.py 구분
+
+메인 hr/urls.py에서 아래와 같이 바꾼다.
+```
+from django.contrib import admin
+from django.urls import path, include
+from ..mentor.views import base_views
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('mentor/', include('mentor.urls')),
+    path('common/', include('common.urls')),
+    path('', base_views.index, name='index'),
+]
+```
+
+그리고 아래와 같이 mentor/views/urls.py의 내용을 바꿔준다. repl관련 함수는 사용하지 않는다.
+```
+from django.urls import path
+#from . import views
+
+from .views import base_views, profile_views, comment_views
+
+app_name = 'mentor'
+
+urlpatterns = [
+    # base_views.py
+    path('', base_views.index, name = 'index'),
+    path('<int:profile_id>/', base_views.detail, name='detail'),
+    
+    #profile_views.py
+    path('profile/create/', profile_views.profile_create, name='profile_create'),
+    path('profile/modify/<int:profile_id>/', profile_views.profile_modify, name='profile_modify'),
+    path('profile/delete/<int:profile_id>/', profile_views.profile_delete, name='profile_delete'),
+    
+    #comment_views.py
+    path('comment/create/<int:profile_id>/', comment_views.comment_create, name='comment_create'),
+    path('comment/modify/<int:comment_id>/', comment_views.comment_modify, name='comment_modify'),
+]
+```
+이제 관련해서 나올 수 있는 각종 버그들을 확인하고 다음으로 넘어가자.
+
+## 12. 추천기능 만들기
+
+슬슬 좋아요 버튼을 만들어보자.
+
+### 12.1 모델 변경
+
+우선 모델에 좋아요를 추가한다. Profile, Comment 다 추가한다. 원래는 Repl에도 추가해야한다. 
+User가 profile, comment 양쪽에 사용될 수 있기떄문에 각각의 구분이 필요하다. 그래서 related_name을 추가해준다.
+
+```
+voter = models.ManyToManyField(User, related_name='voter_profile')
+```
+comment의 경우 아래와 같은 수정도 필요하다.
+``` user_id = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_id_profile') ```
+
+### 12.2 버튼 생성
+
+우선 탬플릿에 추천 관련 버튼을 만들어야한다. 다행히 class=recommend가 있으니 활용할 수 있다.
+예시와는 조금 다른 방식을 채택했는데, 짧은 질문이 아니고 긴 자기소개가 되기에 아래처럼 추천만 간단히 넣었다
+
+```
+<div class="row my-3"> <!-- 상단부분 구분 -->
+    <div class="col-1"> <!-- 왼쪽 1의 비중을 추천으로 두고 -->
+        <div class="bg-light text-center p-3 border font-weight-bolder mb-1">{{profile.voter.count}}</div>
+        <a href="#"
+           class="recommend btn btn-sm btn-secondary btn-block my-1">추천</a>
+    </div>
+
+    <div class="col-11"> <!-- 나머지를 12개정도로 쪼개서 오른쪽으로 두고 -->
+        {% if request.user == profile.user_id %} <!-- 수정/삭제 -->
+        <div class="d-flex justify-content-end">
+            <a href = "{% url 'mentor:profile_modify' profile.id %}"
+               class="btn btn-sm btn-outline-secondary">수정</a>
+            <a href="#" class="delete btn btn-sm btn-outline-secondary"
+               data-uri="{% url 'mentor:profile_delete' profile.id %}">삭제</a>
+        </div>
+        {% endif %}
+        <div class="d-flex justify-content-end"> <!-- 만든 날짜. 수정날짜도 추가해야함 -->
+            <div class="badge badge-light p-2">{{profile.create_date}}</div>
+        </div>
+    </div>
+</div> <!-- 여기까지 상단 내용 -->
+
+```
+
+### 12.3 정말 추천하시겠습니까?
+
+해당 부분은 왜 넣는지 모르겠다. 좋으면 좋은거지. javascript를 조금 응용하는데, 우린 쓰지 않도록 하자.
+자세히 보면 12.2 버튼 생성에도 data-uri를 쓰지 않는다.
+
+### 12.4 노가다
+
+url 매핑 등의 나머지 작업들을 해보자.
+
+mentor/urls.py에 vote_views를 import 하고, 관련 path를 만든다. vote_views.py 파일도 생성한다.
+
+vote_profile 함수 - 본인이 본인 글 추천을 못하게 한다. 그리고 messages로 에러를 출력한다.
+
+```
+@login_required(login_url='common:login')
+def vote_profile(request, profile_id):
+    profile = get_object_or_404(Profile, pk=profile_id)
+    if request.user == profile.author:
+        messages.error(request, "본인이 작성한 글은 추천할 수 없습니다")
+    else:
+        profile.voter.add(request.user)
+    return redirect('mentor:detail', profile_id=profile.id)
+```
+messages를 어떻게 출력할지도 html에서 지정할 수 있다.
+
+```
+{% if messages %}
+    <div class="alert alert-danger my-3" role="alert">
+        {% for message in messages %}
+        <strong>{{message.tags}}</strong>
+        <ul><li>{{message.message}}</li></ul>
+        {% endfor %}
+    </div>
+    {% endif %}
+```
+
+
+
