@@ -30,7 +30,9 @@ AWS의 Route53에 adedata.com 서버를 등록하고, 4가지 임시 도메인�
 ## React
 
 언제까지 장고로 js를 만들고, 꾸미고, 작업을 할 수는 없다. UI개선을 위해 React.js를 써야한다 (jQuery한두개를 쓰긴 했지만 리액트가 프론트에는 좋다고 한다)
-React를 공부하며 배운 바는 아래와 같다
+React를 공부하며 배운 바는 아래와 같다.
+
+주로 이 링크를 많이 참조했다 : https://reactjs.org/tutorial/tutorial.html
 
 1. Django와 함께 쓰이고, 앱 단위로 UI를 꾸미는 것 같다.
 2. React는 component (함수와 비슷한것) 위주로 구성된다. 인풋이 정해져있고, 아웃풋 형태가 html과 유사하다.
@@ -64,20 +66,168 @@ React.createElement("li", null, "Oculus")));
 아래 코드를 보면 이해가 조금 더 잘된다
 
 9개의 3x3상자를 그리려고 한다면, react에서는 html을 아래처럼 할 수 있다
-```
+```python
 <div className="board-row">
   {this.renderSquare(0)}
   {this.renderSquare(1)}
   {this.renderSquare(2)}
 </div>
-
+```
 
 board-row가 원래 장고 코드라면 따로 style.css에 저장이 되어있어야한다. 하지만 여긴 그런게 없어도 비슷한 형식으로 만들어주나보다
-this.renderSquare()에서, renderSquare는 
+this.renderSquare()에서, renderSquare는 아래처럼 만들어져있다. 인풋을 하나 받는다. 
 
+```python
 class Board extends React.Component {
   renderSquare(i) {
     return <Square value={i} />;
   }
+```  
   
+renderSquare함수는 또 Square를 받는다. 이건 또 뭐냐.
+
+```
+class Square extends React.Component {
+  render() {
+    return (
+      <button className="square">
+        {this.props.value}
+      </button>
+    );
+  }
+}
+```
+이런식이다. render()로 되면 저렇게 <Square ~~~ >입력을 받을 수 있는 것 같다. 
+그리고 그 안에 html소스코드를 넣어주면 된다. 그러면 반복적인 html이 필요 없어진다.
+이렇게 component들로 여러개를 만들어두면, 나중에 디자인만 여기저기 재조합하기 편하다. 
+하나하나 html 바꾸고, <div> 몇십개를 레이어로 해놓고 해메는것보다 훨씬 편리하다.
   
+여기에, js에서 할 수 있는 반응을 넣을 수 있다.
+
+```
+class Square extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      value: null,
+    };
+  }
+
+  render() {
+    return (
+      <button
+        className="square"
+        onClick={() => this.setState({value: 'X'})}
+      >
+        {this.state.value}
+      </button>
+    );
+  }
+}
+```
+이런 코드를 보면, 현재 상태를 null로 지정하고 클릭 시 상태를 X로 변환할 수 있다.
+그렇다면, 특정 조건에 어떤 반응을 넣고싶으면 어떻게 할까?
+원래 장고라면 반응에 대한 계산을 views.py에서 하고, 그 결과 노출을 css에서 하지 않았을까 싶다.
+
+React에선 아래와 같다.
+
+```
+handleClick(i) {
+    const squares = this.state.squares.slice();
+    squares[i] = 'X';
+    this.setState({squares: squares});
+  }
+```
+이러면 명령대로 null 이 X로 바뀐다.
+
+이러한 작업을 거치면 최종 작업은 아래와 같다.
+
+Board라는 클래스만 가져왔고, 또 다른 다양한 클래스들도 있다.
+```
+class Board extends React.Component {
+  handleClick(i) {
+    const squares = this.state.squares.slice();
+    if (calculateWinner(squares) || squares[i]) {
+      return;
+    }
+    squares[i] = this.state.xIsNext ? 'X' : 'O';
+    this.setState({
+      squares: squares,
+      xIsNext: !this.state.xIsNext,
+    });
+  }
+
+  renderSquare(i) {
+    return (
+      <Square
+        value={this.props.squares[i]}
+        onClick={() => this.props.onClick(i)}
+      />
+    );
+  }
+
+  render() {
+    const winner = calculateWinner(this.state.squares);
+    let status;
+    if (winner) {
+      status = 'Winner: ' + winner;
+    } else {
+      status = 'Next player: ' + (this.state.xIsNext ? 'X' : 'O');
+    }
+
+    return (
+      <div>
+        <div className="status">{status}</div>
+        <div className="board-row">
+          {this.renderSquare(0)}
+          {this.renderSquare(1)}
+          {this.renderSquare(2)}
+        </div>
+        <div className="board-row">
+          {this.renderSquare(3)}
+          {this.renderSquare(4)}
+          {this.renderSquare(5)}
+        </div>
+        <div className="board-row">
+          {this.renderSquare(6)}
+          {this.renderSquare(7)}
+          {this.renderSquare(8)}
+        </div>
+      </div>
+    );
+  }
+}
+```
+보면 클래스 내에 쓸 수 있는 툴이 있다. 결국 사용되는건 render()함수고, 여기서 계산을 하고 결과를 html형식으로 출력한다.
+보면 출력되는 html은 네모 9개가 다이고, 이는 return 값에 그대로 있다.
+그에 대한 연산을 renderSquare에서 하고, 이게 <Square>을 부르는데, 그 Square 안에 필요한 숫자를 인풋으로 넣어준다.
+  이 부분 (component)에서 인풋 (interaction)도 받고, 그래서 onClick도 한다. 여기선 결과물 시각화와 출력만 한다.
+그리고 다른 class들이 결과물을 뽑고, 우승자 출력/ 계산 등을 아마 메인에서 할 것이다. (이건 하나의 클래스일 뿐이다)
+이렇게 여러 클래스를 가진 후, 각각의 앱?부분을 모아서 어떠한 상황엔 class를 출력하고, 우승자가 생기면 보이지 않을 수 있다.
+일반적인 함수처럼 코드를 짤 수 있다.
+그리고 여기의 class는 장고의 Model과 비슷하게 작용한다.
+
+궁금한점은, 여기서 className="board-row" 등장하지 않는 클래스들도 사용된다. 이들이 아마 기본 디자인? js/ css? 같다
+근데 프론트엔트라고 하기에, 결국 css는 누가 하는건지 모르겠다.
+결론은, js가 interactive한건 알겠는데 views-html 의 render get 사용과 뭐가 다른지 잘 모르겠고 (뭐 팝업 뛰우는 등은 알겠다. 근데 여기서 그걸 쓰진 않는다)
+css는 또다른 영역이란것이다.
+
+## 장고 + 리액트
+
+이제 핵심은, 이미 장고로 쓴 부분을 어떻게 리액트로 변환하는지이다.
+기존에 쓴 html은 아마 100% 버릴 것이지만, 그래도 어느정도 얼추 사용은 가능하다.
+문제는 views의 내용들과 url내용이다. 이를 다 버릴것인가? 어떻게 사용이 되는것인가?
+그리고 models를 어느정도 사용을 해야한다. 그래야 DB에 저장이 가능하다. 그럼 models는 어떻게 사용할 것인가?
+이에 대해 우선 해결책을 후가려고 아래 링크를 사용한다.
+https://www.valentinog.com/blog/drf/
+
+Django REST + React를 사용하는 형태를 알려주는데, 이를 참고해보자.
+
+
+
+
+
+
+
+
+
