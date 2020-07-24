@@ -223,11 +223,115 @@ https://www.valentinog.com/blog/drf/
 
 Django REST + React를 사용하는 형태를 알려주는데, 이를 참고해보자.
 
+해당 링크는 세가지를 제시하는데, 두번째가 내가 생각한 방식이다.
+model, view, url 등을 모두 장고에서 짜고, 해당 view를 import 해서 쓰는 형식이다.
+JWT를 쓴다고 하는데 이게 뭔지는 모르지만, 이 떄문에 어렵고 복잡하다고 한다.
+
+두번째 방식은, model, view, url모두 쓰긴 하는데 조금 다르다.
+model은 그대로 가져가고, url -> view를 하는데 한줄만 있다. 여기서 있는 view함수 하나가 
+```
+def index(request):
+    return render(request, 'frontend/index.html')
+```
+이런다. 그러면 해당 페이지의 모든 frontend 관련 함수들과 html들이 index.html에 저장되어있다.
+그러면, index.html 내에 여러 함수가 있고, 위에 보인것처럼 prop()을 쓰고 그 함수를 쓰면 된다. class도 그 안에서 만들어버린다.
+
+아래 링크는 그 어렵다는 방식을 쓴다.
+http://milooy.github.io/TIL/Django/react-with-django-rest-framework.html#react-redux-react-router
+
+보면 모델에
+```
+class Moim(models.Model):
+    author = models.ForeignKey('auth.User')
+    title = models.CharField(max_length=200)
+    text = models.TextField()
+    date = models.DateTimeField()
+    ...
+```
+을 만들고 
+
+url을 아래처럼 만들고
+```
+urlpatterns = [
+    url(r'^moim/$', MoimListView.as_view(), name='moim'),
+]
+```
+
+views.py에 아래처럼 만든다.
+```
+class MoimListSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Moim
+        fields = ('id', 'author', 'title', 'text', 'created_date')
 
 
+# api/moim 으로 get하면 이 listview로 연결
+class MoimListView(generics.ListAPIView):
+    queryset = Moim.objects.all()
+    serializer_class = MoimListSerializer
 
+    def list(self, request):
+        queryset = self.get_queryset()
+        serializer_class = self.get_serializer_class()
+        serializer = serializer_class(queryset, many=True)
 
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
 
+        return Response(serializer.data)
+```
+Serializer가 무엇을 하는지 모르고, API가 헷갈리지만... 특히, generic을 써서 폼이 더 엉망이지만 view가 비어있진 않다. 
+  비교용으로, 위에서는 
 
+```def index(request):
+    return render(request, 'frontend/index.html') 
+```
+이 한줄로 모든게 index.html로 넘어갔다.
 
+그리고 view에 사용된 함수를 사용하는데, 
 
+```
+import axios from 'axios'
+export const FETCH_MOIM = 'FETCH_MOIM';
+
+export function fetchMoim() {
+  const request = axios.get('/api/moim/');
+  return {
+    type: FETCH_MOIM,
+    payload: request
+  }
+}
+```
+라는 actions/index.js를 가져온 후
+containers/MoimList.js에서
+```
+import { fetchMoim } from '../actions/index';
+
+class MoimList extends Component {
+  componentDidMount() {
+    this.props.fetchMoim();
+  }
+
+  renderMoim () {
+    return this.props.moimList.map((moim) => {
+      return <li key={moim.id}><Moim moimData={moim}/></li>;
+    });
+  }
+  ....
+```
+라는 형식으로 사용한다. 
+import fetchMoim from actions/index를 가져오는데, 여기있는 fetchMoim이란 함수가 axios.get('/api/moim')을 통해 views의 함수를 불러낸다.
+
+실제로 매우 복잡한 구조다. 애초에 containers/MoimList.js - actions/index.js - views.py를 왔다갔다 하는건데,
+이를 html에 모두 때려박는것으로 대체가 가능하다.
+
+그러면 form은 또 어디에 들어가는가?
+Django-REST-API는 뭐냐...
+
+## 결론.
+
+새로 만든다. front를 전부 react로 바꿔본다.
+우선 오늘 탬플릿을 만들고, 첫페이지만 구상해보자 - profile list 페이지 정도만... 그러고나면 문제가 보이겠지.
